@@ -319,6 +319,18 @@
   .auth-btn:hover{opacity:0.85;}
   .auth-btn:disabled{opacity:0.5;cursor:not-allowed;}
   .auth-footer{font-size:11px;color:var(--text3);text-align:center;line-height:1.5;}
+  /* Password toggle */
+  .pwd-wrap{position:relative;}
+  .pwd-wrap input{padding-right:42px;}
+  .pwd-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;display:flex;align-items:center;transition:color 0.15s;}
+  .pwd-toggle:hover{color:var(--text2);}
+  .pwd-toggle svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  /* Day grouping */
+  .day-section{margin-bottom:1.5rem;}
+  .day-header{font-size:12px;font-weight:600;color:var(--text3);text-transform:capitalize;letter-spacing:0.04em;padding:6px 0 10px;border-bottom:1px solid var(--border);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+  .day-header.today{color:var(--accent);}
+  .day-header.past{color:var(--forgotten);}
+  .day-count{font-size:11px;font-weight:500;background:var(--surface3);color:var(--text3);padding:1px 7px;border-radius:20px;}
   /* Logout btn */
   .logout-btn{width:34px;height:34px;border-radius:var(--radius-sm);background:none;border:1px solid var(--border);cursor:pointer;color:var(--text3);display:flex;align-items:center;justify-content:center;transition:background 0.15s,color 0.15s,border-color 0.15s;flex-shrink:0;}
   .logout-btn:hover{background:var(--surface3);color:var(--danger);border-color:var(--danger);}
@@ -402,8 +414,11 @@
     <div class="auth-field">
       <input type="email" id="auth-email" placeholder="correo@ejemplo.com" autocomplete="email" />
     </div>
-    <div class="auth-field">
+    <div class="auth-field pwd-wrap">
       <input type="password" id="auth-password" placeholder="Contraseña (mín. 6 caracteres)" autocomplete="current-password" onkeydown="if(event.key==='Enter')authSubmit()" />
+      <button class="pwd-toggle" type="button" onclick="togglePwd()" aria-label="Mostrar/ocultar contraseña" tabindex="-1">
+        <svg id="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
     </div>
     <div id="auth-error" class="auth-error"></div>
     <button id="auth-submit" class="auth-btn" onclick="authSubmit()">Iniciar sesión</button>
@@ -626,6 +641,20 @@ function translateAuthError(msg){
   return msg;
 }
 
+function togglePwd(){
+  const inp = $('auth-password');
+  const icon = $('eye-icon');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    // eye-off icon
+    icon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+  } else {
+    inp.type = 'password';
+    // eye icon
+    icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+  }
+}
+
 async function authSubmit(){
   const email = $('auth-email').value.trim();
   const password = $('auth-password').value;
@@ -679,6 +708,16 @@ async function syncDelete(id){
   if (error) showToast('Error al eliminar en la nube');
 }
 
+let _realtimeChannel = null;
+function subscribeRealtime(){
+  if (_realtimeChannel) sb.removeChannel(_realtimeChannel);
+  _realtimeChannel = sb.channel('db-reminders')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reminders' }, async function(){
+      await loadDataFromSupabase();
+    })
+    .subscribe();
+}
+
 async function syncStatus(r){
   const { error } = await sb.from('reminders').update({
     status: r.done ? 'done' : (r.forgotten ? 'forgotten' : 'pending'),
@@ -693,6 +732,7 @@ sb.auth.onAuthStateChange(async function(event, session){
     currentUser = session.user;
     $('auth-screen').style.display = 'none';
     await loadDataFromSupabase();
+    subscribeRealtime();
   } else {
     currentUser = null;
     reminders = [];
@@ -1255,22 +1295,53 @@ function render(){
     return;
   }
 
-  const active   = filtered.filter(function(r){ return isActive(r); });
-  const pending  = filtered.filter(function(r){ return !r.done && !r.forgotten && !isActive(r); });
-  const forgotten= filtered.filter(function(r){ return r.forgotten && !r.done; });
-  const done     = filtered.filter(function(r){ return r.done; });
+  // ── Group by day ─────────────────────────────────────────
+  const dateMap = {};
+  filtered.forEach(function(r){
+    const key = r.date || '__nodate__';
+    if (!dateMap[key]) dateMap[key] = [];
+    dateMap[key].push(r);
+  });
+
+  const sortedDates = Object.keys(dateMap).sort(function(a, b){
+    if (a === '__nodate__') return 1;
+    if (b === '__nodate__') return -1;
+    return a.localeCompare(b);
+  });
 
   let h = '';
-  if (active.length)   { h += sectionLabel('En curso ahora', active.length);   active.forEach(function(r){ h += itemHTML(r); }); }
-  if (pending.length)  { h += sectionLabel('Pendientes', pending.length);       pending.forEach(function(r){ h += itemHTML(r); }); }
-  if (forgotten.length){ h += sectionLabel('Olvidadas', forgotten.length);      forgotten.forEach(function(r){ h += itemHTML(r); }); }
-  if (done.length)     { h += sectionLabel('Completadas', done.length);         done.forEach(function(r){ h += itemHTML(r); }); }
+  sortedDates.forEach(function(dateKey){
+    const items = dateMap[dateKey].sort(function(a, b){ return timeToMin(a.start) - timeToMin(b.start); });
+    let headerText, headerCls;
+    if (dateKey === '__nodate__') { headerText = 'Sin fecha'; headerCls = ''; }
+    else { const dl = dayLabel(dateKey); headerText = dl.text; headerCls = dl.cls; }
+
+    h += '<div class="day-section">';
+    h += '<div class="day-header ' + headerCls + '">' + headerText +
+         '<span class="day-count">' + items.length + '</span></div>';
+    items.forEach(function(r){ h += itemHTML(r); });
+    h += '</div>';
+  });
   list.innerHTML = h;
 }
 
 function sectionLabel(text, count){
   return '<div class="section-label">' + text +
     '<span class="section-count">' + count + '</span></div>';
+}
+
+function dayLabel(ds){
+  const p = ds.split('-').map(Number);
+  const dt = new Date(p[0], p[1]-1, p[2]);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
+  const yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
+  const full = dt.toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long' });
+  if (dt.getTime() === today.getTime())     return { text: 'Hoy · ' + full,     cls: 'today' };
+  if (dt.getTime() === tomorrow.getTime())  return { text: 'Mañana · ' + full,  cls: '' };
+  if (dt.getTime() === yesterday.getTime()) return { text: 'Ayer · ' + full,    cls: 'past' };
+  if (dt < today)                           return { text: full,                 cls: 'past' };
+  return { text: full, cls: '' };
 }
 
 function itemHTML(r){
