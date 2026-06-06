@@ -722,7 +722,13 @@ async function loadDataFromSupabase(){
 
 async function syncUpsert(r){
   const { error } = await sb.from('reminders').upsert(toRow(r));
-  if (error) showToast('Error al guardar en la nube');
+  if (error){
+    // Retry once after 2 seconds
+    setTimeout(async function(){
+      const { error: e2 } = await sb.from('reminders').upsert(toRow(r));
+      if (e2) showToast('⚠️ Sin conexión — reintentando...');
+    }, 2000);
+  }
 }
 
 async function syncDelete(id){
@@ -1538,10 +1544,10 @@ render();
 // Refresh UI every 60s (active state + relative time hints)
 setInterval(function(){ render(); updateDate(); }, 60000);
 
-// Sync with Supabase every 20s — garantiza sincronización entre dispositivos
+// Sync with Supabase every 10s — garantiza sincronización entre dispositivos
 setInterval(async function(){
   if (currentUser) await loadDataFromSupabase();
-}, 20000);
+}, 10000);
 </script>
 </body>
 </html>
