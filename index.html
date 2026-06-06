@@ -695,14 +695,25 @@ async function authSubmit(){
 }
 
 async function signOut(){
-  Object.keys(alarmTimers).forEach(function(id){ clearTimeout(alarmTimers[id]); });
-  Object.keys(forgottenTimers).forEach(function(id){ clearTimeout(forgottenTimers[id]); });
-  alarmTimers = {}; forgottenTimers = {};
-  if (_realtimeChannel){ sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
-  await sb.auth.signOut();
+  try {
+    // Detener todos los timers activos
+    try {
+      Object.keys(alarmTimers).forEach(function(id){ clearTimeout(alarmTimers[id]); });
+      Object.keys(forgottenTimers).forEach(function(id){ clearTimeout(forgottenTimers[id]); });
+      alarmTimers = {}; forgottenTimers = {};
+    } catch(e){}
+    // Desconectar realtime
+    try {
+      if (_realtimeChannel){ sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
+    } catch(e){}
+    // Cerrar sesión en Supabase
+    await sb.auth.signOut();
+  } catch(e){}
+  // Forzar reset de estado local sin importar si hubo errores arriba
   currentUser = null;
   reminders = [];
-  render();
+  try { render(); } catch(e){}
+  // Mostrar pantalla de login
   $('auth-screen').style.display = 'flex';
   $('auth-email').value = '';
   $('auth-password').value = '';
