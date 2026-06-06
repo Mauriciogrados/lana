@@ -113,7 +113,7 @@
   /* ── Header: brand + acción principal ── */
   .app-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;gap:12px;}
   .logo-wrap{display:flex;align-items:center;gap:10px;min-width:0;}
-  .logo-img{width:52px;height:52px;object-fit:contain;flex-shrink:0;}
+  .logo-img{width:72px;height:72px;object-fit:contain;flex-shrink:0;}
   .logo-text{min-width:0;}
   .logo-text h1{font-size:24px;font-weight:700;letter-spacing:-0.5px;line-height:1.2;color:var(--text);white-space:nowrap;}
   .logo-text .subtitle{font-size:10px;letter-spacing:0.04em;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -217,7 +217,7 @@
   #list.switching{opacity:0;}
   .list-view .reminder-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:6px;transition:border-color 0.2s,opacity 0.3s,box-shadow 0.2s;}
   .list-view .reminder-item:hover{box-shadow:0 2px 12px rgba(0,0,0,0.10);}
-  .grid-view{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+  .grid-view{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px;}
   .grid-view .section-label{grid-column:1/-1;}
   .grid-view .reminder-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:10px;transition:border-color 0.2s,opacity 0.3s,transform 0.2s,box-shadow 0.2s;}
   .grid-view .reminder-item:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.12);}
@@ -241,13 +241,23 @@
   .r-relative.soon{color:var(--amber);}
   .r-relative.very-soon{color:var(--danger);}
   .r-relative.active-now{color:var(--green);}
-  .r-actions{display:flex;gap:4px;flex-shrink:0;}
-  .icon-btn{width:34px;height:34px;border:none;background:none;cursor:pointer;border-radius:var(--radius-sm);color:var(--text3);display:flex;align-items:center;justify-content:center;transition:background 0.12s,color 0.12s;}
-  .icon-btn:hover{background:var(--icon-btn-hover);color:var(--text);}
-  .icon-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
-  .icon-btn.danger:hover{background:var(--danger-light);color:var(--danger);}
-  .icon-btn.edit:hover{background:var(--accent-light);color:var(--accent);}
-  .icon-btn.complete:hover{background:var(--green-light);color:var(--green);}
+  .r-actions{display:flex;gap:6px;flex-shrink:0;align-items:center;}
+  /* ── Action buttons — redesigned ── */
+  .icon-btn{width:36px;height:36px;border:1px solid var(--border);background:var(--surface3);cursor:pointer;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;transition:all 0.15s;position:relative;}
+  .icon-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform 0.15s;}
+  .icon-btn:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.25);}
+  /* Edit — accent */
+  .icon-btn.edit{color:var(--accent);background:var(--accent-light);border-color:rgba(139,127,232,0.3);}
+  .icon-btn.edit:hover{background:rgba(139,127,232,0.28);border-color:var(--accent);box-shadow:0 4px 12px rgba(139,127,232,0.25);}
+  .icon-btn.edit:hover svg{transform:rotate(-8deg);}
+  /* Complete — green */
+  .icon-btn.complete{color:var(--green);background:var(--green-light);border-color:rgba(78,203,168,0.3);}
+  .icon-btn.complete:hover{background:rgba(78,203,168,0.28);border-color:var(--green);box-shadow:0 4px 12px rgba(78,203,168,0.22);}
+  .icon-btn.complete:hover svg{transform:scale(1.15);}
+  /* Delete — neutral → danger on hover */
+  .icon-btn.danger{color:var(--text3);background:var(--surface3);border-color:var(--border);}
+  .icon-btn.danger:hover{color:var(--danger);background:var(--danger-light);border-color:rgba(255,112,112,0.35);box-shadow:0 4px 12px rgba(255,112,112,0.2);}
+  .icon-btn.danger:hover svg{transform:scale(1.1);}
 
   /* ── No results ── */
   .no-results{text-align:center;padding:2rem 1rem;color:var(--text3);}
@@ -305,7 +315,7 @@
   .auth-screen{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--surface);padding:1.5rem;}
   .auth-card{width:100%;max-width:380px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem 2rem 1.75rem;display:flex;flex-direction:column;gap:0;}
   .auth-logo-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:1.5rem;gap:8px;}
-  .auth-logo{width:56px;height:56px;object-fit:contain;}
+  .auth-logo{width:72px;height:72px;object-fit:contain;}
   .auth-title{font-size:22px;font-weight:700;color:var(--text);letter-spacing:-0.5px;}
   .auth-sub{font-size:10px;color:var(--text3);letter-spacing:0.04em;margin-top:2px;}
   .auth-tabs{display:flex;background:var(--surface3);border-radius:var(--radius-sm);padding:3px;margin-bottom:1.25rem;}
@@ -327,9 +337,9 @@
   .pwd-toggle svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
   /* Day grouping */
   .day-section{margin-bottom:1.5rem;}
-  .day-header{font-size:12px;font-weight:600;color:var(--text3);text-transform:capitalize;letter-spacing:0.04em;padding:6px 0 10px;border-bottom:1px solid var(--border);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
-  .day-header.today{color:var(--accent);}
-  .day-header.past{color:var(--forgotten);}
+  .day-header{font-size:13px;font-weight:600;color:var(--text);letter-spacing:0.01em;padding:6px 0 10px;border-bottom:1px solid var(--border);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .day-header.today{color:var(--text);}
+  .day-header.past{color:var(--text3);font-weight:500;}
   .day-count{font-size:11px;font-weight:500;background:var(--surface3);color:var(--text3);padding:1px 7px;border-radius:20px;}
   /* Logout btn */
   .logout-btn{width:34px;height:34px;border-radius:var(--radius-sm);background:none;border:1px solid var(--border);cursor:pointer;color:var(--text3);display:flex;align-items:center;justify-content:center;transition:background 0.15s,color 0.15s,border-color 0.15s;flex-shrink:0;}
@@ -348,7 +358,7 @@
   @media(max-width:600px){
     body{padding:1rem 0.875rem;}
     .app{max-width:100%;}
-    .logo-img{width:42px;height:42px;}
+    .logo-img{width:56px;height:56px;}
     .logo-text h1{font-size:19px;}
     .logo-text .subtitle{font-size:9px;}
     .logo-text .date{font-size:11px;}
@@ -685,7 +695,19 @@ async function authSubmit(){
 }
 
 async function signOut(){
+  Object.keys(alarmTimers).forEach(function(id){ clearTimeout(alarmTimers[id]); });
+  Object.keys(forgottenTimers).forEach(function(id){ clearTimeout(forgottenTimers[id]); });
+  alarmTimers = {}; forgottenTimers = {};
+  if (_realtimeChannel){ sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
   await sb.auth.signOut();
+  currentUser = null;
+  reminders = [];
+  render();
+  $('auth-screen').style.display = 'flex';
+  $('auth-email').value = '';
+  $('auth-password').value = '';
+  $('auth-error').textContent = '';
+  showAuthTab('login');
 }
 
 // ── Supabase data sync ────────────────────────────────────
@@ -710,12 +732,23 @@ async function syncDelete(id){
 
 let _realtimeChannel = null;
 function subscribeRealtime(){
-  if (_realtimeChannel) sb.removeChannel(_realtimeChannel);
-  _realtimeChannel = sb.channel('db-reminders')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'reminders' }, async function(){
-      await loadDataFromSupabase();
-    })
-    .subscribe();
+  if (_realtimeChannel){ sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
+  _realtimeChannel = sb.channel('lana-reminders-' + currentUser.id)
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'reminders', filter: 'user_id=eq.' + currentUser.id },
+      async function(payload){
+        // Optimistic: update local state directly before full reload
+        if (payload.eventType === 'DELETE') {
+          reminders = reminders.filter(function(r){ return String(r.id) !== String(payload.old.id); });
+          render();
+        } else {
+          await loadDataFromSupabase();
+        }
+      }
+    )
+    .subscribe(function(status){
+      if (status === 'SUBSCRIBED') console.log('[LANA] Realtime conectado');
+    });
 }
 
 async function syncStatus(r){
@@ -1330,13 +1363,14 @@ function sectionLabel(text, count){
     '<span class="section-count">' + count + '</span></div>';
 }
 
+function capFirst(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 function dayLabel(ds){
   const p = ds.split('-').map(Number);
   const dt = new Date(p[0], p[1]-1, p[2]);
   const today = new Date(); today.setHours(0,0,0,0);
   const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
   const yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
-  const full = dt.toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long' });
+  const full = capFirst(dt.toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long', year:'numeric' }));
   if (dt.getTime() === today.getTime())     return { text: 'Hoy · ' + full,     cls: 'today' };
   if (dt.getTime() === tomorrow.getTime())  return { text: 'Mañana · ' + full,  cls: '' };
   if (dt.getTime() === yesterday.getTime()) return { text: 'Ayer · ' + full,    cls: 'past' };
