@@ -733,23 +733,22 @@ async function syncDelete(id){
 let _realtimeChannel = null;
 function subscribeRealtime(){
   if (_realtimeChannel){ sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
-  _realtimeChannel = sb.channel('lana-reminders-' + currentUser.id)
+  _realtimeChannel = sb.channel('lana-changes')
     .on('postgres_changes',
-      { event: '*', schema: 'public', table: 'reminders', filter: 'user_id=eq.' + currentUser.id },
-      async function(payload){
-        // Optimistic: update local state directly before full reload
-        if (payload.eventType === 'DELETE') {
-          reminders = reminders.filter(function(r){ return String(r.id) !== String(payload.old.id); });
-          render();
-        } else {
-          await loadDataFromSupabase();
-        }
+      { event: '*', schema: 'public', table: 'reminders' },
+      async function(){
+        await loadDataFromSupabase();
       }
     )
-    .subscribe(function(status){
-      if (status === 'SUBSCRIBED') console.log('[LANA] Realtime conectado');
-    });
+    .subscribe();
 }
+
+// Refresco cuando el usuario vuelve a la pestaña/app
+document.addEventListener('visibilitychange', async function(){
+  if (!document.hidden && currentUser) {
+    await loadDataFromSupabase();
+  }
+});
 
 async function syncStatus(r){
   const { error } = await sb.from('reminders').update({
