@@ -1535,8 +1535,13 @@ $('btn-list-view').setAttribute('aria-pressed', currentView === 'list' ? 'true' 
 $('btn-grid-view').setAttribute('aria-pressed', currentView === 'grid' ? 'true' : 'false');
 render();
 
-// Refresh every 60s to update "active" state and relative time hints
+// Refresh UI every 60s (active state + relative time hints)
 setInterval(function(){ render(); updateDate(); }, 60000);
+
+// Sync with Supabase every 20s — garantiza sincronización entre dispositivos
+setInterval(async function(){
+  if (currentUser) await loadDataFromSupabase();
+}, 20000);
 </script>
 </body>
 </html>
