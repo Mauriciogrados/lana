@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>L.A.N.A.</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#8B7FE8">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   /* ═══════════════ DARK THEME (default) ═══════════════ */
@@ -599,6 +601,18 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentUser = null;
 let _authTab = 'login';
 
+// Calcula alarm_ts (UTC) a partir de la fecha/hora local del recordatorio
+function calcAlarmTs(r){
+  if (!r.date || !r.start) return null;
+  try {
+    var p = r.date.split('-').map(Number);
+    var t = r.start.split(':').map(Number);
+    if (p.length < 3 || t.length < 2) return null;
+    var alarmDate = new Date(p[0], p[1]-1, p[2], t[0], t[1] - (r.alarm || 0), 0, 0);
+    return alarmDate.toISOString();
+  } catch(e){ return null; }
+}
+
 // Map reminder object → DB row
 function toRow(r){
   return {
@@ -612,7 +626,8 @@ function toRow(r){
     alarm_offset: r.alarm || 0,
     category: r.category || '',
     status: r.done ? 'done' : (r.forgotten ? 'forgotten' : 'pending'),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
+    alarm_ts: calcAlarmTs(r)
   };
 }
 
@@ -787,6 +802,8 @@ sb.auth.onAuthStateChange(async function(event, session){
     $('auth-screen').style.display = 'none';
     await loadDataFromSupabase();
     subscribeRealtime();
+    // Activa push notifications (pide permiso si es la primera vez)
+    setTimeout(function(){ registerPush(); }, 2000);
   } else {
     currentUser = null;
     reminders = [];
@@ -1532,6 +1549,88 @@ setInterval(function(){ render(); updateDate(); }, 60000);
 setInterval(async function(){
   if (currentUser) await loadDataFromSupabase();
 }, 10000);
+
+// ── Push Notifications ────────────────────────────────────
+function urlB64ToUint8Array(b64){
+  var pad = '='.repeat((4 - b64.length % 4) % 4);
+  var raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  var arr = new Uint8Array(raw.length);
+  for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+async function registerPush(){
+  if (!currentUser) return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)){
+    console.log('[LANA] Push no soportado en este navegador');
+    return;
+  }
+  try {
+    // 1. Obtiene la clave pública VAPID desde la Edge Function
+    var session = (await sb.auth.getSession()).data.session;
+    if (!session) return;
+    var res = await fetch(
+      'https://fhcjzetbdxplmujikdri.supabase.co/functions/v1/setup-push',
+      { headers: { 'Authorization': 'Bearer ' + session.access_token } }
+    );
+    if (!res.ok){ console.warn('[LANA] setup-push no disponible'); return; }
+    var json = await res.json();
+    var publicKey = json.publicKey;
+    if (!publicKey){ console.warn('[LANA] No VAPID public key'); return; }
+
+    // 2. Registra el Service Worker
+    var reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    await navigator.serviceWorker.ready;
+
+    // 3. Pide permiso
+    var perm = await Notification.requestPermission();
+    if (perm !== 'granted'){
+      console.log('[LANA] Permiso de notificaciones denegado');
+      return;
+    }
+
+    // 4. Suscribe al servidor push
+    var existing = await reg.pushManager.getSubscription();
+    if (existing){ await existing.unsubscribe(); }
+
+    var subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlB64ToUint8Array(publicKey)
+    });
+
+    // 5. Guarda la suscripción en Supabase
+    var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Lima';
+    var upsertRes = await sb.from('push_subscriptions').upsert({
+      user_id: currentUser.id,
+      subscription: subscription.toJSON(),
+      timezone: tz,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+
+    if (!upsertRes.error){
+      showToast('🔔 Notificaciones push activadas');
+      console.log('[LANA] Push subscription guardada');
+    } else {
+      console.error('[LANA] Error guardando push subscription:', upsertRes.error.message);
+    }
+  } catch(e){
+    console.error('[LANA] registerPush error:', e.message || e);
+  }
+}
+
+async function disablePush(){
+  try {
+    if ('serviceWorker' in navigator){
+      var reg = await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.getSubscription();
+      if (sub) await sub.unsubscribe();
+    }
+    await sb.from('push_subscriptions').delete().eq('user_id', currentUser.id);
+    showToast('🔕 Notificaciones push desactivadas');
+  } catch(e){
+    console.error('[LANA] disablePush error:', e);
+  }
+}
 </script>
 </body>
 </html>
