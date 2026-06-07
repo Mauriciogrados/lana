@@ -695,39 +695,44 @@ async function authSubmit(){
 }
 
 async function signOut(){
+  // 1. Limpiar timers
+  try { Object.keys(alarmTimers).forEach(function(id){ clearTimeout(alarmTimers[id]); }); alarmTimers = {}; } catch(e){}
+  try { Object.keys(forgottenTimers).forEach(function(id){ clearTimeout(forgottenTimers[id]); }); forgottenTimers = {}; } catch(e){}
+  // 2. Desconectar realtime
+  try { if (_realtimeChannel){ sb.removeChannel(_realtimeChannel); _realtimeChannel = null; } } catch(e){}
+  // 3. Cerrar sesión en Supabase
+  try { await sb.auth.signOut(); } catch(e){}
+  // 4. Limpiar TODOS los tokens de Supabase del localStorage (fix móvil)
   try {
-    // Detener todos los timers activos
-    try {
-      Object.keys(alarmTimers).forEach(function(id){ clearTimeout(alarmTimers[id]); });
-      Object.keys(forgottenTimers).forEach(function(id){ clearTimeout(forgottenTimers[id]); });
-      alarmTimers = {}; forgottenTimers = {};
-    } catch(e){}
-    // Desconectar realtime
-    try {
-      if (_realtimeChannel){ sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
-    } catch(e){}
-    // Cerrar sesión en Supabase
-    await sb.auth.signOut();
+    Object.keys(localStorage).forEach(function(key){
+      if (key.startsWith('sb-') || key.includes('supabase')) localStorage.removeItem(key);
+    });
   } catch(e){}
-  // Forzar reset de estado local sin importar si hubo errores arriba
+  // 5. Reset estado local
   currentUser = null;
   reminders = [];
   try { render(); } catch(e){}
-  // Mostrar pantalla de login
+  // 6. Mostrar pantalla de login
   $('auth-screen').style.display = 'flex';
-  $('auth-email').value = '';
-  $('auth-password').value = '';
-  $('auth-error').textContent = '';
-  showAuthTab('login');
+  try { $('auth-email').value = ''; $('auth-password').value = ''; $('auth-error').textContent = ''; showAuthTab('login'); } catch(e){}
 }
 
 // ── Supabase data sync ────────────────────────────────────
 async function loadDataFromSupabase(){
+  if (!currentUser) return;
   const { data, error } = await sb.from('reminders').select('*');
-  if (error) { showToast('Error al cargar datos'); return; }
-  reminders = (data || []).map(fromRow);
-  reminders.sort(sortFn);
-  reminders.forEach(function(r){ scheduleAlarm(r); scheduleForgottenCheck(r); });
+  if (error) return; // fallo silencioso en polls de fondo
+  const newReminders = (data || []).map(fromRow);
+  newReminders.sort(sortFn);
+  // Solo programar alarmas para recordatorios NUEVOS (no resetear los existentes)
+  const existingIds = new Set(reminders.map(function(r){ return String(r.id); }));
+  reminders = newReminders;
+  reminders.forEach(function(r){
+    if (!existingIds.has(String(r.id))) {
+      scheduleAlarm(r);
+      scheduleForgottenCheck(r);
+    }
+  });
   render();
 }
 
@@ -1076,7 +1081,7 @@ function relativeHint(r){
 }
 
 // ── Save (create or edit) ─────────────────────────────────
-function saveReminder(){
+async function saveReminder(){
   const title    = $('inp-title').value.trim();
   const date     = $('inp-date').value;
   const start    = $('inp-start').value;
@@ -1086,26 +1091,14 @@ function saveReminder(){
 
   clearFieldErrors();
   let valid = true;
-
-  if (!title) {
-    $('err-title').classList.add('visible');
-    $('inp-title').classList.add('error');
-    $('inp-title').focus();
-    valid = false;
-  }
-  if (!date) {
-    $('err-date').classList.add('visible');
-    $('inp-date').classList.add('error');
-    if (valid) $('inp-date').focus();
-    valid = false;
-  }
-  if (!start || !end || timeToMin(start) >= timeToMin(end)) {
-    $('err-time').classList.add('visible');
-    $('inp-end').classList.add('error');
-    if (valid) $('inp-end').focus();
-    valid = false;
-  }
+  if (!title) { $('err-title').classList.add('visible'); $('inp-title').classList.add('error'); $('inp-title').focus(); valid = false; }
+  if (!date)  { $('err-date').classList.add('visible');  $('inp-date').classList.add('error');  if (valid) $('inp-date').focus();  valid = false; }
+  if (!start || !end || timeToMin(start) >= timeToMin(end)) { $('err-time').classList.add('visible'); $('inp-end').classList.add('error'); if (valid) $('inp-end').focus(); valid = false; }
   if (!valid) return;
+
+  const btn = $('btn-save');
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
 
   const eid = $('edit-id').value;
   if (eid) {
@@ -1113,43 +1106,28 @@ function saveReminder(){
     if (r) {
       if (alarmTimers[r.id])    { clearTimeout(alarmTimers[r.id]);    delete alarmTimers[r.id]; }
       if (forgottenTimers[r.id]){ clearTimeout(forgottenTimers[r.id]); delete forgottenTimers[r.id]; }
-      r.title    = title;
-      r.date     = date;
-      r.start    = start;
-      r.end      = end;
-      r.alarm    = alarm;
-      r.color    = selectedColor;
-      r.category = category;
-      reminders.sort(sortFn);
-      saveData();
-      scheduleAlarm(r);
-      scheduleForgottenCheck(r);
-      render();
-      showToast('✏️ Recordatorio actualizado');
-      syncUpsert(r);
+      r.title = title; r.date = date; r.start = start; r.end = end;
+      r.alarm = alarm; r.color = selectedColor; r.category = category;
+      const { error } = await sb.from('reminders').upsert(toRow(r));
+      if (!error) {
+        scheduleAlarm(r); scheduleForgottenCheck(r);
+        await loadDataFromSupabase();
+        showToast('✏️ Recordatorio actualizado');
+      } else { showToast('❌ Error al guardar — intenta de nuevo'); }
     }
   } else {
-    const r = {
-      id: Date.now(),
-      title: title,
-      date: date,
-      start: start,
-      end: end,
-      color: selectedColor,
-      alarm: alarm,
-      category: category,
-      done: false,
-      forgotten: false
-    };
-    reminders.push(r);
-    reminders.sort(sortFn);
-    saveData();
-    scheduleAlarm(r);
-    scheduleForgottenCheck(r);
-    render();
-    showToast('✅ Recordatorio guardado');
-    syncUpsert(r);
+    const r = { id: Date.now(), title: title, date: date, start: start, end: end,
+                color: selectedColor, alarm: alarm, category: category, done: false, forgotten: false };
+    const { error } = await sb.from('reminders').upsert(toRow(r));
+    if (!error) {
+      scheduleAlarm(r); scheduleForgottenCheck(r);
+      await loadDataFromSupabase();
+      showToast('✅ Recordatorio guardado');
+    } else { showToast('❌ Error al guardar — intenta de nuevo'); }
   }
+
+  btn.disabled = false;
+  btn.textContent = eid ? 'Guardar cambios' : 'Guardar recordatorio';
   closeForm();
 }
 
@@ -1218,17 +1196,16 @@ function markForgotten(id, notify){
   const r = reminders.find(function(x){ return x.id === id; });
   if (!r || r.done || r.forgotten) return;
   r.forgotten = true;
-  saveData();
   render();
+  await syncStatus(r);
   if (notify) showToast('📋 Tarea marcada como olvidada');
-  syncStatus(r);
 }
 
 // FIX: user clicked "Sí, la completé" in forgotten modal
 function markDoneFromModal(){
   if (pendingForgottenId !== null) {
     const r = reminders.find(function(x){ return x.id === pendingForgottenId; });
-    if (r) { r.done = true; r.forgotten = false; saveData(); render(); showToast('✅ Tarea completada'); syncStatus(r); }
+    if (r) { r.done = true; r.forgotten = false; render(); await syncStatus(r); showToast('✅ Tarea completada'); }
     pendingForgottenId = null;
   }
   $('forgotten-modal').classList.remove('open');
@@ -1262,29 +1239,25 @@ function confirmDelete(){
   if (alarmTimers[id])    { clearTimeout(alarmTimers[id]);    delete alarmTimers[id]; }
   if (forgottenTimers[id]){ clearTimeout(forgottenTimers[id]); delete forgottenTimers[id]; }
   reminders = reminders.filter(function(x){ return x.id !== id; });
-  saveData();
-  render();
-  showToast('Recordatorio eliminado');
-  syncDelete(id);
+  render(); // optimista
   pendingDeleteId = null;
   $('confirm-modal').classList.remove('open');
+  await syncDelete(id);
+  showToast('🗑️ Recordatorio eliminado');
 }
 
 // ── Actions ───────────────────────────────────────────────
-function toggleDone(id){
+async function toggleDone(id){
   const r = reminders.find(function(x){ return x.id === id; });
   if (!r) return;
   if (r.forgotten && !r.done) { r.forgotten = false; r.done = true; }
   else { r.done = !r.done; if (r.done) r.forgotten = false; }
-  if (r.done && forgottenTimers[id]) {
-    clearTimeout(forgottenTimers[id]);
-    delete forgottenTimers[id];
-  }
+  if (r.done && forgottenTimers[id]) { clearTimeout(forgottenTimers[id]); delete forgottenTimers[id]; }
   if (!r.done) scheduleForgottenCheck(r);
-  saveData();
-  render();
-  showToast(r.done ? '✅ Tarea completada' : '↩️ Marcada como pendiente');
-  syncStatus(r);
+  render(); // optimista
+  const msg = r.done ? '✅ Tarea completada' : '↩️ Marcada como pendiente';
+  await syncStatus(r);
+  showToast(msg);
 }
 function editReminder(id){ openFormForEdit(id); }
 
