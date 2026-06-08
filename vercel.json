@@ -1,10 +1,4 @@
 {
-  "buildCommand": null,
-  "outputDirectory": ".",
-  "framework": null,
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/$1" }
-  ],
   "headers": [
     {
       "source": "/sw.js",
@@ -13,6 +7,5 @@
         { "key": "Cache-Control", "value": "no-cache" }
       ]
     }
-  ],
-  "ignoreCommand": "exit 1"
+  ]
 }
