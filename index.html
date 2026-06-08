@@ -1118,6 +1118,8 @@ async function saveReminder(){
   btn.textContent = 'Guardando...';
 
   const eid = $('edit-id').value;
+  let saved = false;
+
   if (eid) {
     const r = reminders.find(function(x){ return x.id === parseInt(eid); });
     if (r) {
@@ -1130,6 +1132,7 @@ async function saveReminder(){
         scheduleAlarm(r); scheduleForgottenCheck(r);
         await loadDataFromSupabase();
         showToast('✏️ Recordatorio actualizado');
+        saved = true;
       } else { showToast('❌ Error al guardar — intenta de nuevo'); }
     }
   } else {
@@ -1140,12 +1143,13 @@ async function saveReminder(){
       scheduleAlarm(r); scheduleForgottenCheck(r);
       await loadDataFromSupabase();
       showToast('✅ Recordatorio guardado');
+      saved = true;
     } else { showToast('❌ Error al guardar — intenta de nuevo'); }
   }
 
   btn.disabled = false;
   btn.textContent = eid ? 'Guardar cambios' : 'Guardar recordatorio';
-  closeForm();
+  if (saved) closeForm();
 }
 
 function sortFn(a, b){
@@ -1195,7 +1199,7 @@ function scheduleForgottenCheck(r){
   if (diff <= 0) {
     // Already past the window
     const endT = new Date(dp[0], dp[1]-1, dp[2], ep[0], ep[1], 0, 0);
-    if (now > endT && !r.done && !r.forgotten) markForgotten(r.id, false);
+    if (now > endT && !r.done && !r.forgotten) markForgotten(r.id, false).catch(function(){});
     return;
   }
   forgottenTimers[r.id] = setTimeout(function(){
@@ -1232,7 +1236,7 @@ function closeModal(){ $('alarm-modal').classList.remove('open'); }
 function closeForgottenModal(){
   // User confirmed they didn't complete it → mark forgotten
   if (pendingForgottenId !== null) {
-    markForgotten(pendingForgottenId, true);
+    markForgotten(pendingForgottenId, true).catch(function(){});
     pendingForgottenId = null;
   }
   $('forgotten-modal').classList.remove('open');
@@ -1589,11 +1593,9 @@ async function registerPush(){
       return;
     }
 
-    // 4. Suscribe al servidor push
+    // 4. Suscribe al servidor push (reutiliza suscripción existente si ya hay una)
     var existing = await reg.pushManager.getSubscription();
-    if (existing){ await existing.unsubscribe(); }
-
-    var subscription = await reg.pushManager.subscribe({
+    var subscription = existing || await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlB64ToUint8Array(publicKey)
     });
