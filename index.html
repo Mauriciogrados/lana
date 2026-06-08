@@ -1209,7 +1209,7 @@ function scheduleForgottenCheck(r){
   }, diff);
 }
 
-function markForgotten(id, notify){
+async function markForgotten(id, notify){
   const r = reminders.find(function(x){ return x.id === id; });
   if (!r || r.done || r.forgotten) return;
   r.forgotten = true;
@@ -1219,7 +1219,7 @@ function markForgotten(id, notify){
 }
 
 // FIX: user clicked "Sí, la completé" in forgotten modal
-function markDoneFromModal(){
+async function markDoneFromModal(){
   if (pendingForgottenId !== null) {
     const r = reminders.find(function(x){ return x.id === pendingForgottenId; });
     if (r) { r.done = true; r.forgotten = false; render(); await syncStatus(r); showToast('✅ Tarea completada'); }
@@ -1250,7 +1250,7 @@ function closeConfirmModal(){
   pendingDeleteId = null;
   $('confirm-modal').classList.remove('open');
 }
-function confirmDelete(){
+async function confirmDelete(){
   if (pendingDeleteId === null) return;
   const id = pendingDeleteId;
   if (alarmTimers[id])    { clearTimeout(alarmTimers[id]);    delete alarmTimers[id]; }
